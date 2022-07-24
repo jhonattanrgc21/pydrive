@@ -1,8 +1,8 @@
-from logging import exception
+import os
 from pydrive2.auth import GoogleAuth
 from pydrive2.drive import GoogleDrive
 
-CREDENTIALS = 'credentials.json'
+CREDENTIALS = 'config/credentials.json'
 
 # INICIO DE SESION 
 def login():
@@ -15,7 +15,7 @@ def login():
     gauth.LoadCredentialsFile(CREDENTIALS)
     
     if gauth.access_token_expired:
-        gauth.refresh()
+        gauth.Refresh()
         gauth.SaveCredentialsFile(CREDENTIALS)
     else:
         gauth.Authorize()
@@ -70,10 +70,130 @@ def download_file(id_file, download_path):
     file_name = file['title']
     file.GetContentFile(download_path + file_name)
     
+# BUSCAR ARCHIVOS EN GOOGLE DRIVE
+def search(query):
+    '''
+    Retorna una lista de archivos correspondientes a la query de entrada.
+    La query puede ser: title, id, embedLink, downloadUrl, mimeType, createdDate', modifiedDate', fileSize
+    Si no se envia una query, se puede obtener la lista de todos los archivos que esten en Google Drive
+    '''
+    
+    response = []
+    credentials = login()
+    
+    '''
+    Se pueden utilizar parametros adicionales como filtros de busqueda
+    para la operacion ListFile
+    
+    Los parametros adicionales se pueden consultar aqui: https://developers.google.com/drive/api/v3/reference/files/list
+    '''
+    #list_file = credentials.ListFile().GetList()
+    list_file = credentials.ListFile({'q': query}).GetList()
+
+    # Recorre la lista de archivos encontrados
+    i = 1
+    for f in list_file:
+        print('\nItem: ', i)
+        
+        # ID Drive
+        print('ID Drive:',f['id'])
+        # Link de visualizacion embebido
+        print('Link de visualizacion embebido:',f['embedLink'])
+        # Nombre del archivo
+        print('Nombre del archivo:',f['title'])
+        # Tipo de archivo
+        print('Tipo de archivo:',f['mimeType'])
+        # Esta en el basurero
+        print('Esta en el basurero:',f['labels']['trashed'])
+        # Fecha de creacion
+        print('Fecha de creacion:',f['createdDate'])
+        # Fecha de ultima modificacion
+        print('Fecha de ultima modificacion:',f['modifiedDate'])
+        # Version
+        print('Version:',f['version'])
+        
+        try:
+            # Link de descarga
+            print('Link de descarga:',f['downloadUrl'])
+        except:
+            pass
+
+        try:
+            # Tamanio
+            print('Tamanio:',f['fileSize'])
+        except:
+            pass
+            
+        response.append(f)
+        i += 1
+    
+    return response
+
+# BORRAR/RECUPERAR ARCHIVOS EN GOOGLE DRIVE
+def delete_recuperate(id_file):
+    '''
+    Recibe el id de un archivo que este en Google Drive.
+    Sobre el se pueden aplicar operaciones de eliminar o restaurar.
+    '''
+    
+    credenciales = login()
+    file = credenciales.CreateFile({'id': id_file})
+    
+    try:
+        '''
+        Se pueden utilizar 3 metodos
+        
+        - Mover al basurero: file.Trash()
+        - Recuperar del basurero: file.Trash()
+        - Eliminar permanentemente: file.Delete()
+        
+        Para este ejemplo se usara la operacion de mover al basurero
+        '''
+        file.Trash()
+    except:
+        print('Error, el archivo con ese id no existe')
+    
+# CREAR CARPETA
+def create_folder(name_folder, id_folder):
+    '''
+    Recibe el nombre de la carpeta  el id para la ubicacion
+    '''
+    
+    credenciales = login()
+    
+    folder = credenciales.CreateFile({
+        'title': name_folder, 
+        'mimeType': 'application/vnd.google-apps.folder',
+        'parents': [{
+            "kind": "drive#fileLink",
+            "id": id_folder
+            }]
+    })
+    
+    folder.Upload()
+
 # CUERPO PRINCIPAL
 def main():
-    #create_file('test.txt', 'Esto es una prueba usando PyDrive2!', "13HgFJ0NJyaEUk82pQ9HVKQ8Z0W9NYMzB")
-    #upload_file('/home/jhonattanrgc21/Documentos/meme.png', "13HgFJ0NJyaEUk82pQ9HVKQ8Z0W9NYMzB")
-    download_file("16fzu5zcfFDy5BOFpGtbT6Z4EczqcUreJ", '/home/jhonattanrgc21/Descargas/')
+    file_name = 'test2.txt'
+    folder_name = 'Prueba3'
+    file_content = 'Esto es una prueba usando PyDrive2!'
+    id_file = '1nIv16WMCWFFTimEE8A1jPrmvouLqs9H2'
+    id_folder = '13HgFJ0NJyaEUk82pQ9HVKQ8Z0W9NYMzB'
+    file_path = '/home/jhonattanrgc21/Documentos/meme.png'
+    download_path = '/home/jhonattanrgc21/Descargas/'
+    
+    
+    #create_file(file_name, file_content, id_folder)
+    #upload_file(file_path, id_folder)
+    #download_file(id_file , download_path)
+    search("title = 'meme.png'")
+    #delete_recuperate(id_file)
+    #create_folder(folder_name, id_folder)
+    pass
+
 if __name__ == '__main__':
+    if not (os.path.exists('config/credentials.json')):
+        gauth = GoogleAuth()
+        gauth.LocalWebserverAuth() 
+        
     main()
